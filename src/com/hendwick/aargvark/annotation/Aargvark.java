@@ -10,4 +10,5 @@ import java.lang.annotation.RetentionPolicy;
 public @interface Aargvark {
     boolean strictOptions() default false;
     boolean extrasAreFatal() default false;
+    boolean enableHelp() default false;
 }

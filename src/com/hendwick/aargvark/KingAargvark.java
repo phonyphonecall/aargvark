@@ -20,25 +20,26 @@ public class KingAargvark {
     private Iterator<String> currentArg;
     private boolean strictOptions;
     private boolean extrasAreFatal;
+    private boolean enableHelp;
 
     public KingAargvark(String[] args) {
         this.args = args;
     }
 
-    public <T> T parse(Class<T> aargvarkClass) throws AargvarkException {
-        try {
-            T aargvark = aargvarkClass.newInstance();
-            this.aargvarkClass = aargvarkClass;
-            this.aargvark = aargvark;
-            parse();
-            return aargvark;
-        } catch (InstantiationException | IllegalAccessException e) {
-            throw new AargvarkException("Aargvark class (" + aargvarkClass.getCanonicalName() + ") must have a public zero-arg constructor.", e);
-        } finally {
-            this.aargvark = null;
-            this.aargvarkClass = null;
-        }
-    }
+//    public <T> T parse(Class<T> aargvarkClass) throws AargvarkException {
+//        try {
+//            T aargvark = aargvarkClass.newInstance();
+//            this.aargvarkClass = aargvarkClass;
+//            this.aargvark = aargvark;
+//            parse();
+//            return aargvark;
+//        } catch (InstantiationException | IllegalAccessException e) {
+//            throw new AargvarkException("Aargvark class (" + aargvarkClass.getCanonicalName() + ") must have a public zero-arg constructor.", e);
+//        } finally {
+//            this.aargvark = null;
+//            this.aargvarkClass = null;
+//        }
+//    }
 
     public void marshal(Object aargvark) throws AargvarkException {
         try {
@@ -63,6 +64,8 @@ public class KingAargvark {
         Aargvark aargvark = aargvarkClass.getAnnotation(Aargvark.class);
         if(aargvark != null) {
             this.strictOptions = aargvark.strictOptions();
+            this.enableHelp = aargvark.enableHelp();
+            this.extrasAreFatal = aargvark.extrasAreFatal();
         }
     }
 
@@ -97,6 +100,13 @@ public class KingAargvark {
     }
 
     private void parseArgument(String arg) throws AargvarkException {
+        if (arg.equals("--help")) {
+            if (enableHelp) {
+                printHelp();
+                System.out.println("WARNING: '--help' ignored due to configuration");
+                return;
+            }
+        }
         Field f = options.get(arg);
         if (f != null) {
             parseField(arg, f);
@@ -110,8 +120,19 @@ public class KingAargvark {
         }
     }
 
+    private void printHelp() {
+        System.out.println("Usage:");
+        List<Field> fields = Arrays.asList(aargvarkClass.getFields());
+        fields.forEach((field) -> {
+            Aargument aargument = field.getAnnotation(Aargument.class);
+            if (aargument != null) {
+                System.out.println(String.format("\t-%c  --%s  %s", aargument.shortName(), field.getName(), aargument.usage()));
+            }
+        });
+        System.exit(-1);
+    }
+
     private void parseField(String arg, Field f) throws AargvarkException {
-        Aargument fieldAnnotation = f.getAnnotation(Aargument.class);
         Class<?> fieldClass = f.getType();
         if (fieldClass == boolean.class) {
             parseBooleanField(arg, f);
@@ -220,12 +241,12 @@ public class KingAargvark {
     }
 
     private void cleanup() throws AargvarkException {
-        for (Map.Entry<String, Field> entry : options.entrySet()) {
+        for (Map.Entry<String, Field> entry : options.entrySet())
             if (entry.getValue().getAnnotation(Aargument.class).require()) {
                 throw new AargvarkException(String.format("Missing required parameter: '%s'", entry.getKey()));
             }
-        }
     }
+
 
 
     private void illegalAccess(String arg, Field f, Throwable e) throws AargvarkException {
